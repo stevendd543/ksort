@@ -13,12 +13,17 @@ MODULE_DESCRIPTION("Concurrent sorting driver");
 MODULE_VERSION("0.1");
 
 #define DEVICE_NAME "sort"
-
+#define SORT_IOCTL_SET_ALGORITHM _IOW('s', 1, sort_algorithm_t)
 static dev_t dev = -1;
 static struct cdev cdev;
 static struct class *class;
 
 struct workqueue_struct *workqueue;
+
+typedef enum { SORT_QSORT, SORT_TIMSORT } sort_algorithm_t;
+
+static sort_algorithm_t sorting_algorithm = SORT_TIMSORT;
+
 
 static int sort_open(struct inode *inode, struct file *file)
 {
@@ -33,6 +38,18 @@ static int sort_release(struct inode *inode, struct file *file)
 static int num_compare(const void *a, const void *b)
 {
     return (*(int *) a - *(int *) b);
+}
+
+static long sort_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+    switch (cmd) {
+    case SORT_IOCTL_SET_ALGORITHM:
+        sorting_algorithm = (sort_algorithm_t) arg;
+        break;
+    default:
+        return -EINVAL;
+    }
+    return 0;
 }
 
 static ssize_t sort_read(struct file *file,
@@ -59,7 +76,14 @@ static ssize_t sort_read(struct file *file,
      * various types in the future.
      */
     es = sizeof(int);
-    sort_main(sort_buffer, size / es, es, num_compare);
+    switch (sorting_algorithm) {
+    case SORT_QSORT:
+        sort_main(sort_buffer, size / es, es, num_compare, 1);
+        break;
+    default:
+        break;
+    }
+
 
     len = copy_to_user(buf, sort_buffer, size);
     if (len != 0)
@@ -82,6 +106,7 @@ static const struct file_operations fops = {
     .write = sort_write,
     .open = sort_open,
     .release = sort_release,
+    .unlocked_ioctl = sort_ioctl,
     .owner = THIS_MODULE,
 };
 

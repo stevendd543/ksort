@@ -2,9 +2,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #define KSORT_DEV "/dev/sort"
+typedef enum { SORT_QSORT, SORT_TIMSORT } sort_algorithm_t;
+#define SORT_IOCTL_SET_ALGORITHM _IOW('s', 1, sort_algorithm_t)
 
 int main()
 {
@@ -13,7 +16,8 @@ int main()
         perror("Failed to open character device");
         goto error;
     }
-
+    sort_algorithm_t algorithm = SORT_QSORT;
+    ioctl(fd, SORT_IOCTL_SET_ALGORITHM, algorithm);
     size_t n_elements = 1000;
     size_t size = n_elements * sizeof(int);
     int *inbuf = malloc(size);
